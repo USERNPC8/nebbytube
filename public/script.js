@@ -22,18 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPlatform = 'insta';
 
     // --- Inicialização ---
-    // Simular clique inicial para garantir o estado correto (estilos e placeholder)
-    // Usamos setTimeout para garantir que todos os listeners estejam prontos
-    setTimeout(() => {
-        document.querySelector('[data-platform="insta"]').click(); 
-    }, 0);
-    
-    // =================================================================
-    // !!! A CORREÇÃO ESTÁ AQUI !!!
-    // Conecta o botão de BAJAR à função principal de processamento
-    mainBtn.addEventListener('click', processDownload);
-    // =================================================================
+    // Simular clique inicial para garantir o estado correto
+    document.querySelector('[data-platform="insta"]').click(); 
 
+    // **CONEXÃO CRUCIAL DO BOTÃO**
+    mainBtn.addEventListener('click', processDownload);
+    
     // --- Funções de UI Helper ---
     function setLoading(isLoading) {
         if (isLoading) {
@@ -61,19 +55,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lógica de Plataforma ---
     platformBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // Reset visual de todos
             platformBtns.forEach(b => {
                 b.classList.remove('text-white', 'bg-zinc-800', 'shadow-inner', 'border', 'border-white/20');
                 b.classList.add('text-zinc-500', 'hover:text-zinc-300', 'hover:bg-zinc-800/50');
             });
 
-            // Ativar atual
             btn.classList.remove('text-zinc-500', 'hover:text-zinc-300', 'hover:bg-zinc-800/50');
             btn.classList.add('text-white', 'bg-zinc-800', 'shadow-inner', 'border', 'border-white/20');
 
             currentPlatform = btn.getAttribute('data-platform');
             
-            // Atualizar Placeholder
             urlInput.placeholder = currentPlatform === 'insta' ? "Cole o link do Instagram..." : "Cole o link do Threads...";
             resultArea.classList.add('hidden');
             hideError();
