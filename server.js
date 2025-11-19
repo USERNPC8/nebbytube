@@ -21,7 +21,6 @@ app.get('/api/resolve', async (req, res) => {
 
     let apiUrl = '';
     
-    // Seleciona a API correta baseada no tipo
     if (type === 'threads') {
         apiUrl = `https://api.vreden.my.id/api/v1/download/threads?url=${encodeURIComponent(url)}`;
     } else if (type === 'insta') {
@@ -40,13 +39,12 @@ app.get('/api/resolve', async (req, res) => {
 
         const data = await response.json();
         
-        // Variáveis de retorno
         let mediaUrl = null;
         let thumbnail = null;
 
-        // --- Lógica de Extração CORRIGIDA ---
+        // --- Lógica de Extração (CORRIGIDA para o JSON que você enviou) ---
         if (type === 'threads') {
-            // Threads (usa "result" e "media")
+            // Threads usa "result" e "media"
             const mediaList = data.result?.media;
             if (mediaList && mediaList.length > 0) {
                 mediaUrl = mediaList[0].url;
@@ -54,10 +52,8 @@ app.get('/api/resolve', async (req, res) => {
             }
 
         } else if (type === 'insta') {
-            // Instagram (usa "resultado" e "dados" ou "data")
+            // Instagram usa "resultado" e "dados"
             const rootData = data.resultado || data.result;
-            
-            // Tenta extrair de diferentes estruturas (dados/data)
             const mediaList = rootData?.dados || rootData?.data; 
             
             if (Array.isArray(mediaList) && mediaList.length > 0) {
@@ -86,7 +82,7 @@ app.get('/api/resolve', async (req, res) => {
 });
 
 /**
- * Rota de Proxy para Download (Stream do arquivo de vídeo real)
+ * Rota de Proxy para Download
  */
 app.get('/api/proxy-download', async (req, res) => {
     const { url, filename } = req.query;
@@ -95,22 +91,20 @@ app.get('/api/proxy-download', async (req, res) => {
 
     try {
         console.log(`[INFO] Iniciando proxy de download: ${filename}`);
-        // Configura o timeout para a requisição de download, em caso de links muito grandes
         const response = await fetch(url);
         
         if (!response.ok) throw new Error(`Erro ao baixar arquivo original: status ${response.status}`);
 
-        // Define os cabeçalhos para forçar o download no navegador
         res.setHeader('Content-Disposition', `attachment; filename="${filename || 'video.mp4'}"`);
         res.setHeader('Content-Type', 'video/mp4');
 
-        // Faz o pipe (transfere) do stream de dados para o cliente
+        // Faz o pipe do stream para o cliente
         response.body.pipe(res);
 
     } catch (error) {
         console.error('[ERRO] Proxy download:', error.message);
         if (!res.headersSent) {
-             res.status(500).send('Erro ao realizar o download do arquivo. Tente novamente.');
+             res.status(500).send('Erro ao realizar o download do arquivo.');
         }
     }
 });
