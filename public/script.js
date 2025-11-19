@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Simular clique inicial para garantir o estado correto
     document.querySelector('[data-platform="insta"]').click(); 
 
-    // **CONEXÃO CRUCIAL DO BOTÃO**
+    // **CONEXÃO CRUCIAL DO BOTÃO (GARANTIDA)**
+    // Este listener garante que o clique chama a função principal.
     mainBtn.addEventListener('click', processDownload);
     
     // --- Funções de UI Helper ---
