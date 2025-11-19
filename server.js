@@ -5,131 +5,115 @@ const fetch = require('node-fetch');
 
 const app = express();
 const port = 3000;
-const API_KEY = 'dantes15s'; // Chave da API mantida no servidor
 
-// Configurar CORS
 app.use(cors());
-
-// Servir arquivos estáticos da pasta public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Endpoint para busca de vídeos
-app.get('/api/search', async (req, res) => {
-    const query = req.query.query;
-    if (!query) {
-        return res.status(400).json({ error: 'Parâmetro "query" é obrigatório.' });
+/**
+ * Rota para buscar metadados de mídia (URL de download e Thumbnail)
+ */
+app.get('/api/resolve', async (req, res) => {
+    const { url, type } = req.query;
+
+    if (!url || !type) {
+        return res.status(400).json({ error: 'Parâmetros URL e TYPE são obrigatórios.' });
+    }
+
+    let apiUrl = '';
+    
+    // Seleciona a API correta baseada no tipo
+    if (type === 'threads') {
+        apiUrl = `https://api.vreden.my.id/api/v1/download/threads?url=${encodeURIComponent(url)}`;
+    } else if (type === 'insta') {
+        apiUrl = `https://api.vreden.my.id/api/v1/download/instagram?url=${encodeURIComponent(url)}`;
+    } else {
+        return res.status(400).json({ error: 'Tipo de plataforma inválido. Use "threads" ou "insta".' });
     }
 
     try {
-        const response = await fetch(`https://kamuiapi.shop/api/pesquisa/yt?nome=${encodeURIComponent(query)}&apikey=${API_KEY}`);
+        console.log(`[INFO] Buscando metadados: ${type} - ${url}`);
+        const response = await fetch(apiUrl);
+        
         if (!response.ok) {
-            const errorText = response.status === 403 ? 'Chave de API inválida ou acesso negado.' :
-                             response.status === 429 ? 'Limite de requisições excedido.' :
-                             `Erro HTTP ${response.status}: ${response.statusText}`;
-            throw new Error(errorText);
+            throw new Error(`Erro na API Vreden: status ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Resposta da API de busca:', data); // Log para depuração
-        if (!data || !data.all || !Array.isArray(data.all)) {
-            return res.status(200).json({ results: [], message: 'Nenhum vídeo encontrado ou resposta inválida.' });
+        
+        // Variáveis de retorno
+        let mediaUrl = null;
+        let thumbnail = null;
+
+        // --- Lógica de Extração ---
+        if (type === 'threads') {
+            const mediaList = data.result?.media || data.resultado?.media;
+            if (mediaList && mediaList.length > 0) {
+                mediaUrl = mediaList[0].url;
+                thumbnail = mediaList[0].thumb || mediaList[0].thumbnail;
+            }
+        } else if (type === 'insta') {
+            const rootData = data.result || data.resultado;
+            
+            // Tenta extrair de diferentes estruturas (dados/data)
+            const mediaList = rootData?.dados || rootData?.data;
+            
+            if (Array.isArray(mediaList) && mediaList.length > 0) {
+                mediaUrl = mediaList[0].url;
+                thumbnail = mediaList[0].thumb;
+            }
         }
 
-        const videos = data.all.filter(item => item.type === 'video' && item.thumbnail && item.title && item.url);
-        res.json({ results: videos });
-    } catch (error) {
-        console.error('Erro na busca:', error.message);
-        res.status(500).json({ error: error.message || 'Erro ao buscar vídeos.' });
-    }
-});
-
-// Endpoint para download de MP3
-app.get('/api/download', async (req, res) => {
-    const videoUrl = req.query.url;
-    if (!videoUrl) {
-        return res.status(400).json({ error: 'Parâmetro "url" é obrigatório.' });
-    }
-
-    try {
-        const response = await fetch(`https://kamuiapi.shop/api/download/mp3?url=${encodeURIComponent(videoUrl)}&apikey=${API_KEY}`);
-        if (!response.ok) {
-            const errorText = response.status === 403 ? 'Chave de API inválida ou acesso negado.' :
-                             response.status === 429 ? 'Limite de requisições excedido.' :
-                             `Erro HTTP ${response.status}: ${response.statusText}`;
-            throw new Error(errorText);
+        if (!mediaUrl) {
+            console.error('JSON Recebido:', JSON.stringify(data, null, 2));
+            return res.status(404).json({ error: 'Mídia não encontrada na resposta da API.' });
         }
-
-        const data = await response.json();
-        console.log('Resposta da API de download MP3:', data); // Log para depuração
-        if (!data || !data.download || !data.download.downloadLink) {
-            throw new Error('Link de download não disponível.');
-        }
-
+        // Retorna os dados limpos para o frontend
         res.json({
-            downloadLink: data.download.downloadLink,
-            filename: data.download.filename || 'nebby_music.mp3'
+            success: true,
+            downloadUrl: mediaUrl,
+            thumbnail: thumbnail || 'https://via.placeholder.com/300?text=No+Image',
+            filename: `${type}_video_${Date.now()}.mp4`
         });
+
     } catch (error) {
-        console.error('Erro no download MP3:', error.message);
-        res.status(500).json({ error: error.message || 'Erro ao gerar link de download MP3.' });
+        console.error('[ERRO] Ao resolver link:', error.message);
+        res.status(500).json({ error: 'Falha ao processar o link no servidor.' });
     }
 });
 
-// Endpoint para download de MP4
-app.get('/api/download/mp4', async (req, res) => {
-    const videoUrl = req.query.url;
-    if (!videoUrl) {
-        return res.status(400).json({ error: 'Parâmetro "url" é obrigatório.' });
-    }
+/**
+ * Rota de Proxy para Download (Stream do arquivo de vídeo real)
+ */
+app.get('/api/proxy-download', async (req, res) => {
+    const { url, filename } = req.query;
+
+    if (!url) return res.status(400).send('URL é obrigatória');
 
     try {
-        const apiResponse = await fetch(`https://kamuiapi.shop/api/download/mp4?url=${encodeURIComponent(videoUrl)}&apikey=${API_KEY}`);
-        if (!apiResponse.ok) {
-            const errorText = apiResponse.status === 403 ? 'Chave de API inválida ou acesso negado.' :
-                             apiResponse.status === 429 ? 'Limite de requisições excedido.' :
-                             `Erro HTTP ${apiResponse.status}: ${response.statusText}`;
-            throw new Error(errorText);
-        }
+        console.log(`[INFO] Iniciando proxy de download: ${filename}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) throw new Error(`Erro ao baixar arquivo original: status ${response.status}`);
 
-        // Configurar cabeçalhos para download
-        const filename = `nebby_video_${Date.now()}.mp4`;
-        res.setHeader('Content-Type', apiResponse.headers.get('content-type') || 'video/mp4');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename || 'video.mp4'}"`);
+        res.setHeader('Content-Type', 'video/mp4');
 
-        // Encaminhar o fluxo de dados
-        apiResponse.body.pipe(res);
+        // Faz o pipe do stream para o cliente
+        response.body.pipe(res);
+
     } catch (error) {
-        console.error('Erro no download MP4:', error.message);
-        res.status(500).json({ error: error.message || 'Erro ao gerar link de download MP4.' });
+        console.error('[ERRO] Proxy download:', error.message);
+        if (!res.headersSent) {
+             res.status(500).send('Erro ao realizar o download do arquivo.');
+        }
     }
 });
 
-// Rota padrão para servir index.html
+// Rota padrão para servir o index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'pagina.html'));
-});
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'site.html'));
-});
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'upload.html'));
-});
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loja.html'));
-});
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'ps.html'));
-});
-
-// Iniciar o servidor
 app.listen(port, () => {
     console.log(`Servidor rodando em http://localhost:${port}`);
 });
