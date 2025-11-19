@@ -44,18 +44,21 @@ app.get('/api/resolve', async (req, res) => {
         let mediaUrl = null;
         let thumbnail = null;
 
-        // --- Lógica de Extração ---
+        // --- Lógica de Extração CORRIGIDA ---
         if (type === 'threads') {
-            const mediaList = data.result?.media || data.resultado?.media;
+            // Threads (usa "result" e "media")
+            const mediaList = data.result?.media;
             if (mediaList && mediaList.length > 0) {
                 mediaUrl = mediaList[0].url;
                 thumbnail = mediaList[0].thumb || mediaList[0].thumbnail;
             }
+
         } else if (type === 'insta') {
-            const rootData = data.result || data.resultado;
+            // Instagram (usa "resultado" e "dados" ou "data")
+            const rootData = data.resultado || data.result;
             
             // Tenta extrair de diferentes estruturas (dados/data)
-            const mediaList = rootData?.dados || rootData?.data;
+            const mediaList = rootData?.dados || rootData?.data; 
             
             if (Array.isArray(mediaList) && mediaList.length > 0) {
                 mediaUrl = mediaList[0].url;
@@ -65,8 +68,9 @@ app.get('/api/resolve', async (req, res) => {
 
         if (!mediaUrl) {
             console.error('JSON Recebido:', JSON.stringify(data, null, 2));
-            return res.status(404).json({ error: 'Mídia não encontrada na resposta da API.' });
+            return res.status(404).json({ error: `Mídia não encontrada na resposta da API para ${type}.` });
         }
+        
         // Retorna os dados limpos para o frontend
         res.json({
             success: true,
@@ -77,7 +81,7 @@ app.get('/api/resolve', async (req, res) => {
 
     } catch (error) {
         console.error('[ERRO] Ao resolver link:', error.message);
-        res.status(500).json({ error: 'Falha ao processar o link no servidor.' });
+        res.status(500).json({ error: 'Falha ao processar o link no servidor. Verifique o console do Node.js para detalhes.' });
     }
 });
 
@@ -91,20 +95,22 @@ app.get('/api/proxy-download', async (req, res) => {
 
     try {
         console.log(`[INFO] Iniciando proxy de download: ${filename}`);
+        // Configura o timeout para a requisição de download, em caso de links muito grandes
         const response = await fetch(url);
         
         if (!response.ok) throw new Error(`Erro ao baixar arquivo original: status ${response.status}`);
 
+        // Define os cabeçalhos para forçar o download no navegador
         res.setHeader('Content-Disposition', `attachment; filename="${filename || 'video.mp4'}"`);
         res.setHeader('Content-Type', 'video/mp4');
 
-        // Faz o pipe do stream para o cliente
+        // Faz o pipe (transfere) do stream de dados para o cliente
         response.body.pipe(res);
 
     } catch (error) {
         console.error('[ERRO] Proxy download:', error.message);
         if (!res.headersSent) {
-             res.status(500).send('Erro ao realizar o download do arquivo.');
+             res.status(500).send('Erro ao realizar o download do arquivo. Tente novamente.');
         }
     }
 });
