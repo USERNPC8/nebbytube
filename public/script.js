@@ -23,7 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Inicialização ---
     // Simular clique inicial para garantir o estado correto (estilos e placeholder)
-    document.querySelector('[data-platform="insta"]').click(); 
+    // Usamos setTimeout para garantir que todos os listeners estejam prontos
+    setTimeout(() => {
+        document.querySelector('[data-platform="insta"]').click(); 
+    }, 0);
+    
+    // =================================================================
+    // !!! A CORREÇÃO ESTÁ AQUI !!!
+    // Conecta o botão de BAJAR à função principal de processamento
+    mainBtn.addEventListener('click', processDownload);
+    // =================================================================
 
     // --- Funções de UI Helper ---
     function setLoading(isLoading) {
