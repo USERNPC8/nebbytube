@@ -21,6 +21,7 @@ app.get('/api/resolve', async (req, res) => {
 
     let apiUrl = '';
     
+    // Seleciona a API correta baseada no tipo
     if (type === 'threads') {
         apiUrl = `https://api.vreden.my.id/api/v1/download/threads?url=${encodeURIComponent(url)}`;
     } else if (type === 'insta') {
@@ -42,7 +43,7 @@ app.get('/api/resolve', async (req, res) => {
         let mediaUrl = null;
         let thumbnail = null;
 
-        // --- Lógica de Extração (CORRIGIDA para o JSON que você enviou) ---
+        // --- Lógica de Extração (COMPATÍVEL com o JSON que você enviou) ---
         if (type === 'threads') {
             // Threads usa "result" e "media"
             const mediaList = data.result?.media;
@@ -52,7 +53,7 @@ app.get('/api/resolve', async (req, res) => {
             }
 
         } else if (type === 'insta') {
-            // Instagram usa "resultado" e "dados"
+            // Instagram usa "resultado" e "dados" (e "result/data" como fallback)
             const rootData = data.resultado || data.result;
             const mediaList = rootData?.dados || rootData?.data; 
             
@@ -82,7 +83,7 @@ app.get('/api/resolve', async (req, res) => {
 });
 
 /**
- * Rota de Proxy para Download
+ * Rota de Proxy para Download (Stream do arquivo de vídeo real)
  */
 app.get('/api/proxy-download', async (req, res) => {
     const { url, filename } = req.query;
